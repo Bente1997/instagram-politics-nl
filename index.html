@@ -1,0 +1,1772 @@
+﻿<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Feed · Political Instagram</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://unpkg.com/scrollama@3.2.0/build/scrollama.js"></script>
+
+<style>
+  :root {
+    --bg: #06070f;
+    --surface: #0d0f1e;
+    --card: #12152a;
+    --border: #1e2340;
+    --text: #e8eaf2;
+    --muted: #5a6080;
+    --accent-gold: #f0c060;
+    --accent-rose: #e8556a;
+    --accent-teal: #3ee8c0;
+    --accent-violet: #9b7fea;
+    --color-self: #3ee8c0;
+    --color-opponent: #e8556a;
+    --color-unknown: #5a6080;
+    --color-none: #2a2e4a;
+    --font-display: 'Playfair Display', Georgia, serif;
+    --font-mono: 'DM Mono', monospace;
+    --font-body: 'DM Sans', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 4rem 2rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 50% 30%, rgba(155,127,234,0.10) 0%, transparent 70%),
+      radial-gradient(ellipse 60% 40% at 20% 80%, rgba(62,232,192,0.07) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 50% at 80% 60%, rgba(232,85,106,0.06) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .hero-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--accent-teal);
+    margin-bottom: 1.5rem;
+    opacity: 0;
+    animation: fadeUp 0.8s 0.2s forwards;
+  }
+
+  .hero h1 {
+    font-family: var(--font-display);
+    font-size: clamp(3rem, 8vw, 7rem);
+    font-weight: 900;
+    line-height: 1.0;
+    letter-spacing: -0.02em;
+    margin-bottom: 1.5rem;
+    opacity: 0;
+    animation: fadeUp 0.8s 0.4s forwards;
+  }
+
+  .hero h1 em {
+    font-style: italic;
+    color: var(--accent-gold);
+  }
+
+  .hero-sub {
+    max-width: 620px;
+    color: var(--muted);
+    font-size: 1.1rem;
+    line-height: 1.7;
+    margin-bottom: 3rem;
+    opacity: 0;
+    animation: fadeUp 0.8s 0.6s forwards;
+  }
+
+  .hero-stats {
+    display: flex;
+    gap: 3rem;
+    opacity: 0;
+    animation: fadeUp 0.8s 0.8s forwards;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .stat { text-align: center; min-width: 120px; }
+
+  .stat-num {
+    font-family: var(--font-display);
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--accent-teal);
+    line-height: 1;
+  }
+
+  .stat-label {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 0.25rem;
+  }
+
+  .scroll-cue {
+    position: absolute;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    opacity: 0;
+    animation: fadeUp 0.8s 1.2s forwards;
+  }
+
+  .scroll-cue span {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .scroll-line {
+    width: 1px;
+    height: 40px;
+    background: linear-gradient(to bottom, var(--muted), transparent);
+    animation: scrollPulse 2s infinite;
+  }
+
+  .status-banner {
+    margin-top: 1.25rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid rgba(240, 192, 96, 0.25);
+    background: rgba(240, 192, 96, 0.08);
+    color: #f8ddb0;
+    font-size: 0.85rem;
+    max-width: 680px;
+    display: none;
+  }
+
+  .scrolly { position: relative; }
+
+  .sticky-container {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  #viz-canvas {
+    width: 100%;
+    height: 100vh;
+    position: relative;
+    background-image:
+      linear-gradient(to right, #0f1225 1px, transparent 1px),
+      linear-gradient(to bottom, #0f1225 1px, transparent 1px);
+    background-size: 80px 80px;
+    background-position: 0 0;
+  }
+
+  #dots-canvas,
+  #main-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  #dots-canvas {
+    z-index: 1;
+  }
+
+  #main-svg {
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  .steps {
+    position: relative;
+    z-index: 10;
+    padding-top: 0;
+  }
+
+  .step {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    padding: 4rem 2rem;
+    pointer-events: none;
+  }
+
+  .step:first-child { padding-top: 50vh; }
+  .step:last-child  { padding-bottom: 50vh; }
+
+  .step-card {
+    background: rgba(13,15,30,0.92);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent-teal);
+    backdrop-filter: blur(12px);
+    padding: 2rem 2.5rem;
+    max-width: 420px;
+    margin-left: 4vw;
+    pointer-events: all;
+    opacity: 0.3;
+    transform: translateY(16px);
+    transition: opacity 0.4s, transform 0.4s;
+  }
+
+  .step-card.is-active {
+    opacity: 1;
+    transform: none;
+    border-left-color: var(--accent-gold);
+  }
+
+  .step-num {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent-teal);
+    margin-bottom: 0.75rem;
+  }
+
+  .step-card h2 {
+    font-family: var(--font-display);
+    font-size: 1.6rem;
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 0.75rem;
+    color: var(--text);
+  }
+
+  .step-card p {
+    font-size: 0.9rem;
+    color: var(--muted);
+    line-height: 1.65;
+  }
+
+  .step-card .highlight {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  #legend {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    z-index: 100;
+    background: rgba(13,15,30,0.9);
+    border: 1px solid var(--border);
+    padding: 1rem 1.25rem;
+    min-width: 180px;
+    backdrop-filter: blur(12px);
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+
+  #legend.visible { opacity: 1; }
+
+  #legend-title {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.75rem;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.4rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  #tooltip {
+    position: fixed;
+    z-index: 200;
+    pointer-events: none;
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 1rem;
+    max-width: 320px;
+    opacity: 0;
+    transition: opacity 0.2s;
+    font-size: 0.8rem;
+    line-height: 1.5;
+  }
+
+  #tooltip.visible { opacity: 1; }
+  .tt-name {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1rem;
+    margin-bottom: 0.25rem;
+    color: var(--text);
+  }
+  .tt-meta { color: var(--muted); margin-bottom: 0.4rem; }
+  .tt-caption { color: var(--muted); margin-bottom: 0.6rem; font-style: italic; }
+  .tt-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+  .tt-tag {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.15rem 0.4rem;
+    border-radius: 2px;
+  }
+
+  .outro {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 6rem 2rem;
+    position: relative;
+  }
+
+  .outro h2 {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 5vw, 4rem);
+    font-weight: 700;
+    line-height: 1.1;
+    max-width: 760px;
+    margin-bottom: 1.5rem;
+  }
+
+  .outro p {
+    color: var(--muted);
+    max-width: 620px;
+    font-size: 1rem;
+    line-height: 1.7;
+  }
+
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.5rem;
+    max-width: 980px;
+    width: 100%;
+    margin: 3rem auto;
+  }
+
+  .summary-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 1.5rem;
+    text-align: left;
+  }
+
+  .summary-card .sc-label {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+  }
+
+  .summary-card .sc-val {
+    font-family: var(--font-display);
+    font-size: 2.2rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .summary-card .sc-desc {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-top: 0.4rem;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  @keyframes scrollPulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+  }
+
+  .post-dot { cursor: pointer; transition: r 0.2s; }
+  .post-dot:hover { r: 8; }
+  .axis-label {
+    font-family: var(--font-mono);
+    fill: #3a3f5c;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+  }
+
+  @media (max-width: 900px) {
+    .step-card { margin-left: 0; max-width: 100%; }
+    #legend { left: 1rem; right: 1rem; bottom: 1rem; min-width: auto; }
+  }
+
+  .event-glow {
+    stroke: rgba(240, 192, 96, 0.16);
+    stroke-width: 8;
+    opacity: 0.9;
+  }
+
+  .event-line {
+    stroke: rgba(240, 192, 96, 0.78);
+    stroke-dasharray: 6, 6;
+    opacity: 0.95;
+    transition: opacity 0.3s, stroke-width 0.3s, stroke 0.3s;
+  }
+
+  .event:hover .event-line {
+    opacity: 1;
+    stroke: #f7d287;
+    stroke-width: 2.5;
+  }
+
+  .event-label-bg {
+    fill: rgba(6, 7, 15, 0.88);
+    stroke: rgba(240, 192, 96, 0.3);
+    stroke-width: 1;
+    rx: 3;
+  }
+
+  .event-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    fill: #f5d79a;
+    pointer-events: none;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.95;
+    transition: opacity 0.3s, fill 0.3s;
+  }
+
+  .event:hover .event-label {
+    opacity: 1;
+    fill: #fff1cf;
+  }
+
+  .event-marker {
+    fill: var(--accent-gold);
+    opacity: 0.9;
+    transition: all 0.3s;
+  }
+
+  .event:hover .event-marker {
+    opacity: 1;
+    fill: #fff1cf;
+    r: 6;
+  }
+
+  #politician-cards-container {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    transition: opacity 0.4s;
+    pointer-events: none;
+    z-index: 5;
+    background: transparent;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #politician-cards-container.visible {
+    opacity: 1;
+    pointer-events: auto;
+    background: rgba(6, 7, 15, 0.3);
+  }
+
+  .politician-card {
+    position: absolute;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    transition: all 0.3s;
+  }
+
+  .politician-card:hover {
+    border-color: var(--accent-gold);
+    background: rgba(19, 21, 42, 1);
+    box-shadow: 0 0 20px rgba(240, 192, 96, 0.15);
+  }
+
+  .politician-name {
+    font-family: var(--font-display);
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text);
+    text-align: center;
+    line-height: 1.2;
+  }
+
+  .politician-chart {
+    width: 100%;
+    height: 100%;
+  }
+
+  .politician-meta {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .share-bars {
+    width: 100%;
+    display: grid;
+    gap: 0.45rem;
+  }
+
+  .share-row {
+    display: grid;
+    grid-template-columns: 52px 1fr 38px;
+    align-items: center;
+    gap: 0.55rem;
+  }
+
+  .share-label,
+  .share-pct,
+  .share-note {
+    font-family: var(--font-mono);
+    font-size: 0.63rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .share-label { color: var(--muted); }
+
+  .share-pct {
+    color: var(--text);
+    text-align: right;
+  }
+
+  .share-track {
+    height: 10px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.06);
+    overflow: hidden;
+  }
+
+  .share-fill {
+    height: 100%;
+    border-radius: inherit;
+  }
+
+  .share-note {
+    color: var(--muted);
+    margin-top: auto;
+    padding-top: 0.35rem;
+    text-align: right;
+    line-height: 1.35;
+  }
+
+  .share-controls {
+    position: absolute;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.7rem;
+    z-index: 6;
+    pointer-events: auto;
+  }
+
+  .share-control-group {
+    display: flex;
+    gap: 0.7rem;
+  }
+
+  .share-sort-btn {
+    border: 1px solid var(--border);
+    background: rgba(13,15,30,0.92);
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 0.65rem 0.9rem;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s, background 0.2s, transform 0.2s;
+  }
+
+  .share-sort-btn:hover {
+    color: var(--text);
+    border-color: rgba(240, 192, 96, 0.4);
+    transform: translateY(-1px);
+  }
+
+  .share-sort-btn.is-active {
+    color: var(--bg);
+    background: var(--accent-gold);
+    border-color: var(--accent-gold);
+  }
+</style>
+</head>
+<body>
+
+<section class="hero">
+  <p class="hero-eyebrow">Datajournalistiek · Instagram-analyse</p>
+  <h1>The <em>Feed</em><br>& The Frame</h1>
+  <p class="hero-sub">Een visuele analyse van Nederlandse politieke Instagram-posts: wie post, wie staat er in beeld, en hoe verandert dat over de tijd. </p>
+  <div class="hero-stats">
+    <div class="stat">
+      <div class="stat-num" id="hero-posts">-</div>
+      <div class="stat-label">Posts geanalyseerd</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num" id="hero-politicians">-</div>
+      <div class="stat-label">Politici / profielen</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num" id="hero-opponents">-</div>
+      <div class="stat-label">Posts met tegenstander in beeld</div>
+    </div>
+  </div>
+  <div class="status-banner" id="status-banner"></div>
+  <div class="scroll-cue">
+    <span>Scroll to explore</span>
+    <div class="scroll-line"></div>
+  </div>
+</section>
+
+<section class="scrolly">
+  <div class="sticky-container">
+    <div id="viz-canvas">
+      <canvas id="dots-canvas"></canvas>
+      <svg id="main-svg"></svg>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step" data-step="0">
+      <div class="step-card">
+        <div class="step-num">Stap 01 · De feed</div>
+        <h2>Elk bericht, een punt.</h2>
+        <p>Alle Instagram-posts [...]</p>
+      </div>
+    </div>
+
+    <div class="step" data-step="1">
+      <div class="step-card">
+        <div class="step-num">Stap 02 · Wie postte het?</div>
+        <h2>Profielen kleuren de feed.</h2>
+        <p>Kleur per <span class="highlight">politicus / profiel</span>. </p>
+      </div>
+    </div>
+
+    <div class="step" data-step="2b">
+      <div class="step-card">
+        <div class="step-num">Stap 03 · Verdeling per politicus</div>
+        <h2>Wie staat er dominant of überhaupt in beeld?</h2>
+        <p>Per politicus zie je nu een <span class="highlight">percentagegrafiek</span>. Wissel tussen <span class="highlight">dominant in beeld</span> en <span class="highlight">ergens in beeld</span>, en sorteer de kaarten op wie het vaakst zichzelf of juist een tegenstander toont.</p>
+      </div>
+    </div>
+
+    <div class="step" data-step="5">
+      <div class="step-card">
+        <div class="step-num">Stap 05 · De tijdlijn</div>
+        <h2>Wie domineert het beeld over de tijd?</h2>
+        <p>Posts uitgespreid over de <span class="highlight">publicatiedatum</span>. Elke rij staat voor de dominante persoon in beeld.</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section class="outro">
+  <h2>Einde, conclusie</h2>
+  <p>concluderende woorden</p>
+
+  <div class="summary-grid">
+    <div class="summary-card">
+      <div class="sc-label">Meest dominante categorie</div>
+      <div class="sc-val" id="summary-primary-type" style="color: var(--accent-teal)">-</div>
+      <div class="sc-desc" id="summary-primary-desc">-</div>
+    </div>
+    <div class="summary-card">
+      <div class="sc-label">Zelf in beeld</div>
+      <div class="sc-val" id="summary-self-share" style="color: var(--accent-teal)">-</div>
+      <div class="sc-desc">Aandeel posts waar de politicus zelf de grootste persoon in beeld is</div>
+    </div>
+    <div class="summary-card">
+      <div class="sc-label">Tegenstander aanwezig</div>
+      <div class="sc-val" id="summary-opponent-share" style="color: var(--accent-rose)">-</div>
+      <div class="sc-desc">Aandeel posts waar minstens één gezicht als opponent is gelabeld</div>
+    </div>
+    <div class="summary-card">
+      <div class="sc-label">Meeste posts</div>
+      <div class="sc-val" id="summary-top-politician" style="color: var(--accent-violet)">-</div>
+      <div class="sc-desc" id="summary-top-politician-desc">-</div>
+    </div>
+  </div>
+</section>
+
+<div id="legend">
+  <div id="legend-title">Legend</div>
+  <div id="legend-items"></div>
+</div>
+
+<div id="tooltip">
+  <div class="tt-name" id="tt-name"></div>
+  <div class="tt-meta" id="tt-meta"></div>
+  <div class="tt-caption" id="tt-caption"></div>
+  <div class="tt-tags" id="tt-tags"></div>
+</div>
+
+<script>
+const SUBJECT_COLOR = { self: '#3ee8c0', opponent: '#e8556a', unknown: '#5a6080', none: '#2a2e4a' };
+const SUBJECT_LABEL = { self: 'zichzelf', opponent: 'tegenstander', unknown: 'onbekend', none: 'geen gezicht' };
+const PALETTE = ['#e8556a', '#3b82f6', '#22c55e', '#f0c060', '#9b7fea', '#67e8f9', '#e05c20', '#a8a29e', '#ef4444', '#10b981', '#f97316', '#8b5cf6'];
+
+const canvas = document.getElementById('dots-canvas');
+const ctx = canvas.getContext('2d');
+const svg = d3.select('#main-svg');
+const annotG = svg.append('g').attr('class', 'annot-layer');
+const eventLayer = svg.append('g').attr('class', 'event-layer');
+
+const EVENTS = [
+  { date: new Date('2023-11-22'), label: 'Tweede Kamer verkiezingen', type: 'national' },
+  { date: new Date('2024-06-06'), label: 'Europees Parlement verkiezingen', type: 'eu' },
+  { date: new Date('2025-10-29'), label: 'Tweede Kamer verkiezingen', type: 'national' }
+];
+
+let W = window.innerWidth;
+let H = window.innerHeight;
+let DPR = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+let posts = [];
+let nodes = [];
+let politicians = [];
+let scroller = null;
+let currentStep = 0;
+let hoveredNode = null;
+let animationFrame = null;
+let primaryShareSort = 'self';
+let primaryShareMode = 'primary';
+
+function slugify(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
+
+function formatPercent(value) {
+  return `${Math.round(value * 100)}%`;
+}
+
+function setStatus(message, isError = false) {
+  const banner = document.getElementById('status-banner');
+  banner.style.display = message ? 'block' : 'none';
+  banner.textContent = message || '';
+  banner.style.borderColor = isError ? 'rgba(232,85,106,0.25)' : 'rgba(240,192,96,0.25)';
+  banner.style.background = isError ? 'rgba(232,85,106,0.08)' : 'rgba(240,192,96,0.08)';
+  banner.style.color = isError ? '#f1a7b2' : '#f8ddb0';
+}
+
+function mapVizPosts(vizData) {
+  const politicianList = Array.isArray(vizData?.politicians) ? vizData.politicians : [];
+  const politicianMap = new Map(
+    politicianList.map((p, i) => [
+      p.politician_id || p.profile || slugify(p.politician_name || 'unknown'),
+      {
+        sourceKey: p.profile || p.politician_id || '',
+        id: p.politician_id || p.profile || slugify(p.politician_name || 'unknown'),
+        name: p.politician_name || p.profile || 'Unknown',
+        party: p.party || '',
+        profile: p.profile || '',
+        color: p.color || PALETTE[i % PALETTE.length],
+      }
+    ])
+  );
+
+  politicians = Array.from(politicianMap.values()).sort((a, b) => d3.ascending(a.name, b.name));
+
+  const rawPosts = Array.isArray(vizData?.posts) ? vizData.posts : [];
+
+  return rawPosts.map((post, index) => {
+    const polId = post.politician_id || post.profile || slugify(post.politician_name || `post-${index}`);
+    const politicianMeta = politicianMap.get(polId) || {
+      sourceKey: post.profile || polId,
+      id: polId,
+      name: post.politician_name || post.profile || `Post ${index + 1}`,
+      party: post.party || '',
+      profile: post.profile || '',
+      color: post.color || PALETTE[index % PALETTE.length],
+    };
+
+    const primarySubject = post.primary_subject || 'none';
+    const secondarySubject = post.secondary_subject || null;
+    const tertiarySubject = post.tertiary_subject || null;
+    const date = Number.isFinite(post.timestamp)
+      ? new Date(post.timestamp)
+      : (post.date ? new Date(post.date) : new Date('2000-01-01'));
+    const faceCount = Number.isFinite(post.face_count) ? post.face_count : 0;
+    const selfPresent = Boolean(post.has_self) || primarySubject === 'self' || secondarySubject === 'self' || tertiarySubject === 'self';
+    const opponentPresent = Boolean(post.has_opponent) || primarySubject === 'opponent' || secondarySubject === 'opponent' || tertiarySubject === 'opponent';
+    const unknownPresent = Boolean(post.has_unknown) || primarySubject === 'unknown' || secondarySubject === 'unknown' || tertiarySubject === 'unknown';
+
+    return {
+      id: post.id || index,
+      sourceId: post.id || index,
+      politician: politicianMeta,
+      profile: post.profile || politicianMeta.profile || '',
+      party: post.party || politicianMeta.party || '',
+      date,
+      publication_date: post.date || null,
+      caption: post.caption_short || '',
+      faceCount,
+      primarySubject,
+      secondarySubject,
+      tertiarySubject,
+      selfPresent,
+      opponentPresent,
+      unknownPresent,
+      pop_media: false,
+      pop_elite: false,
+      pop_equals: false,
+      anyPop: false,
+    };
+  }).sort((a, b) => a.date - b.date);
+}
+
+async function loadPosts() {
+  const response = await fetch('./data/wies_viz.json');
+  if (!response.ok) {
+    throw new Error(`Kon JSON niet laden (${response.status}) vanaf ./data/wies_viz.json`);
+  }
+  const data = await response.json();
+  return mapVizPosts(data);
+}
+
+function resizeCanvas() {
+  DPR = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+  canvas.width = Math.round(W * DPR);
+  canvas.height = Math.round(H * DPR);
+  canvas.style.width = `${W}px`;
+  canvas.style.height = `${H}px`;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+
+function gridPositions() {
+  if (!nodes.length) return;
+  const cols = Math.ceil(Math.sqrt(nodes.length * W / H));
+  const rows = Math.ceil(nodes.length / cols);
+  const cw = (W - 80) / cols;
+  const ch = (H - 80) / rows;
+  nodes.forEach((n, i) => {
+    n.xGrid = 40 + (i % cols) * cw + cw / 2;
+    n.yGrid = 40 + Math.floor(i / cols) * ch + ch / 2;
+  });
+}
+
+function timelinePositions() {
+  if (!nodes.length) return;
+  const extent = d3.extent(nodes, d => d.date);
+  const xScale = d3.scaleTime().domain(extent).range([100, W - 60]);
+  const yMap = { self: H * 0.22, opponent: H * 0.40, unknown: H * 0.58, none: H * 0.76 };
+  nodes.forEach((n, i) => {
+    const jitter = (((i * 37) % 100) / 100 - 0.5) * 30;
+    n.xTime = xScale(n.date);
+    n.yTime = yMap[n.primarySubject] + jitter;
+  });
+}
+
+function buildClusterPositions() {
+  if (!nodes.length) return;
+  const cx = W / 2;
+  const cy = H / 2;
+  const centers = {
+    self: { x: cx - W * 0.24, y: cy - H * 0.18 },
+    opponent: { x: cx + W * 0.23, y: cy - H * 0.18 },
+    unknown: { x: cx - W * 0.18, y: cy + H * 0.22 },
+    none: { x: cx + W * 0.18, y: cy + H * 0.22 },
+  };
+
+  const groups = d3.group(nodes, d => d.primarySubject || 'none');
+  for (const [key, group] of groups.entries()) {
+    const center = centers[key] || centers.none;
+    group.forEach((n, i) => {
+      const ring = Math.floor(Math.sqrt(i));
+      const angle = i * 2.399963229728653;
+      const radius = 10 + ring * 9;
+      n.xCluster = Math.max(20, Math.min(W - 20, center.x + Math.cos(angle) * radius));
+      n.yCluster = Math.max(20, Math.min(H - 20, center.y + Math.sin(angle) * radius));
+    });
+  }
+}
+
+function smallMultiplesPositions() {
+  if (!nodes.length || !politicians.length) return;
+  const cols = Math.min(4, politicians.length);
+  const rows = Math.ceil(politicians.length / cols);
+  const pw = W / cols;
+  const ph = H / rows;
+  const polIndex = {};
+  politicians.forEach((p, i) => { polIndex[p.id] = i; });
+  const counters = {};
+  politicians.forEach(p => { counters[p.id] = 0; });
+
+  nodes.forEach(n => {
+    const pi = polIndex[n.politician.id] ?? 0;
+    const col = pi % cols;
+    const row = Math.floor(pi / cols);
+    const cx = col * pw + pw / 2;
+    const cy = row * ph + ph / 2;
+    const idx = counters[n.politician.id]++;
+    const angle = idx * 2.399963229728653;
+    const radius = Math.sqrt(idx) * 6.5;
+    n.xSmall = cx + Math.cos(angle) * radius;
+    n.ySmall = cy + Math.sin(angle) * radius;
+  });
+}
+
+function getFill(step, d) {
+  if (step === 0) return '#1a1e38';
+  if (step === 1 || step === '3c') return d.politician.color;
+  if (step === '2b' || step === 7) return 'transparent';
+  return SUBJECT_COLOR[d.primarySubject] || SUBJECT_COLOR.none;
+}
+
+function getStrokeColor(step, d) {
+  if (![2, 3, 5, 6].includes(step)) return null;
+  if (!d.secondarySubject) return null;
+  return SUBJECT_COLOR[d.secondarySubject] || null;
+}
+
+function getStrokeWidth(step, d) {
+  if (![2, 3, 5, 6].includes(step)) return 0;
+  return d.secondarySubject ? 2.2 : 0;
+}
+
+function getStrokeDash(step, d) {
+  return d.tertiarySubject ? [3, 2] : [];
+}
+
+function getOpacity(step, d) {
+  if (step === 5) return 0.92;
+  if (step === 6) return d.opponentPresent ? 1 : 0.08;
+  if (step === '2b' || step === 7) return 0;
+  if (step === 0) return 0.65;
+  return 0.88;
+}
+
+function getRadius(step, d) {
+  if (step === 0) return 3;
+  if (step === 6) return d.opponentPresent ? 6 : 3;
+  return 4.25;
+}
+
+function getTargetCoords(step, d) {
+  if (step === 0 || step === 1 || step === 2) return [d.xGrid, d.yGrid];
+  if (step === '2b' || step === 7) return [-100, -100];
+  if (step === 3 || step === '3c') return [d.xCluster, d.yCluster];
+  if (step === 4 || step === 5) return [d.xTime, d.yTime];
+  return [d.xSmall, d.ySmall];
+}
+
+function applyStepState(step) {
+  nodes.forEach(d => {
+    const [x, y] = getTargetCoords(step, d);
+    d.cx = x;
+    d.cy = y;
+    d.cr = getRadius(step, d);
+    d.cfill = getFill(step, d);
+    d.cstroke = getStrokeColor(step, d);
+    d.cstrokeWidth = getStrokeWidth(step, d);
+    d.cdash = getStrokeDash(step, d);
+    d.copacity = getOpacity(step, d);
+  });
+}
+
+function drawNodes() {
+  ctx.clearRect(0, 0, W, H);
+  for (const d of nodes) {
+    if (d.copacity <= 0) continue;
+    ctx.globalAlpha = d.copacity;
+    if (currentStep === 6 && d.opponentPresent) {
+      ctx.beginPath();
+      ctx.fillStyle = d.cfill;
+      ctx.globalAlpha = 0.12;
+      ctx.arc(d.cx, d.cy, d.cr + 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = d.copacity;
+    }
+    if (d.cstroke && d.cstrokeWidth > 0) {
+      ctx.beginPath();
+      ctx.lineWidth = d.cstrokeWidth;
+      ctx.strokeStyle = d.cstroke;
+      ctx.setLineDash(d.cdash || []);
+      ctx.arc(d.cx, d.cy, d.cr + 2.5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.beginPath();
+    ctx.fillStyle = d.cfill;
+    ctx.arc(d.cx, d.cy, d.cr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  if (hoveredNode) {
+    ctx.globalAlpha = 1;
+    ctx.beginPath();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#f0c060';
+    ctx.arc(hoveredNode.cx, hoveredNode.cy, hoveredNode.cr + 5, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.globalAlpha = 1;
+}
+
+function animateToStep(step, duration = 420) {
+  currentStep = step;
+  if (animationFrame) cancelAnimationFrame(animationFrame);
+
+  const start = performance.now();
+  const starts = nodes.map(d => ({
+    x: d.cx ?? d.x0,
+    y: d.cy ?? d.y0,
+    r: d.cr ?? 3,
+    opacity: d.copacity ?? 0.65
+  }));
+  const ends = nodes.map(d => {
+    const [x, y] = getTargetCoords(step, d);
+    return {
+      x,
+      y,
+      r: getRadius(step, d),
+      fill: getFill(step, d),
+      stroke: getStrokeColor(step, d),
+      strokeWidth: getStrokeWidth(step, d),
+      dash: getStrokeDash(step, d),
+      opacity: getOpacity(step, d)
+    };
+  });
+
+  updateAnnotations(step);
+  updateLegend(step);
+
+  function frame(now) {
+    const t = Math.min(1, (now - start) / duration);
+    const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    nodes.forEach((d, i) => {
+      const s = starts[i];
+      const e = ends[i];
+      d.cx = s.x + (e.x - s.x) * eased;
+      d.cy = s.y + (e.y - s.y) * eased;
+      d.cr = s.r + (e.r - s.r) * eased;
+      d.copacity = s.opacity + (e.opacity - s.opacity) * eased;
+      d.cfill = e.fill;
+      d.cstroke = e.stroke;
+      d.cstrokeWidth = e.strokeWidth;
+      d.cdash = e.dash;
+    });
+    drawNodes();
+    if (t < 1) {
+      animationFrame = requestAnimationFrame(frame);
+    } else {
+      animationFrame = null;
+    }
+  }
+
+  animationFrame = requestAnimationFrame(frame);
+}
+
+function formatMonthTick(date) {
+  return date.toLocaleDateString('nl-NL', { month: 'short', year: '2-digit' });
+}
+
+function renderEvents(xScale, height) {
+  const events = eventLayer.selectAll('.event').data(EVENTS, d => d.label);
+  const enter = events.enter().append('g').attr('class', 'event');
+  enter.append('line').attr('class', 'event-glow');
+  enter.append('line').attr('class', 'event-line');
+  enter.append('circle').attr('class', 'event-marker');
+  enter.append('rect').attr('class', 'event-label-bg');
+  enter.append('text').attr('class', 'event-label');
+  const merged = enter.merge(events);
+
+  merged.select('.event-glow')
+    .attr('x1', d => xScale(d.date))
+    .attr('x2', d => xScale(d.date))
+    .attr('y1', 0)
+    .attr('y2', height)
+    .attr('stroke-linecap', 'round');
+
+  merged.select('.event-line')
+    .attr('x1', d => xScale(d.date))
+    .attr('x2', d => xScale(d.date))
+    .attr('y1', 0)
+    .attr('y2', height)
+    .attr('stroke-width', 2)
+    .attr('stroke-linecap', 'round');
+
+  merged.select('.event-marker')
+    .attr('cx', d => xScale(d.date))
+    .attr('cy', height - 24)
+    .attr('r', 5);
+
+  merged.select('.event-label')
+    .attr('x', d => xScale(d.date))
+    .attr('y', height - 10)
+    .attr('text-anchor', 'middle')
+    .text(d => d.label)
+    .attr('dy', '0.3em');
+
+  merged.select('.event-label-bg')
+    .attr('x', d => xScale(d.date) - 78)
+    .attr('y', height - 23)
+    .attr('width', 156)
+    .attr('height', 18);
+
+  events.exit().remove();
+}
+
+function calculatePoliticianStats(mode = 'primary') {
+  const stats = {};
+  politicians.forEach(p => {
+    const polPosts = posts.filter(post => post.politician.id === p.id);
+    const counts = { self: 0, opponent: 0, unknown: 0, none: 0 };
+    polPosts.forEach(post => {
+      if (mode === 'presence') {
+        if (post.selfPresent) counts.self++;
+        if (post.opponentPresent) counts.opponent++;
+        if (post.unknownPresent) counts.unknown++;
+        if ((post.faceCount || 0) === 0) counts.none++;
+      } else {
+        const subject = post.primarySubject || 'none';
+        if (counts.hasOwnProperty(subject)) {
+          counts[subject]++;
+        }
+      }
+    }); 
+    const total = polPosts.length;
+    stats[p.id] = {
+      politician: p,
+      posts: polPosts,
+      counts,
+      total,
+      percentages: {
+        self: total > 0 ? counts.self / total : 0,
+        opponent: total > 0 ? counts.opponent / total : 0,
+        unknown: total > 0 ? counts.unknown / total : 0,
+        none: total > 0 ? counts.none / total : 0
+      }
+    };
+  });
+  return stats;
+}
+
+function renderPoliticianCards() {
+  const stats = calculatePoliticianStats();
+  let container = document.getElementById('politician-cards-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'politician-cards-container';
+    document.getElementById('viz-canvas').appendChild(container);
+  }
+  
+  container.innerHTML = '';
+  container.classList.add('visible');
+  
+  const cardWidth = 140;
+  const cardHeight = 160;
+  const margin = 20;
+  const cols = Math.max(3, Math.floor((W - 40) / (cardWidth + margin)));
+  const rows = Math.ceil(politicians.length / cols);
+  const containerW = cols * (cardWidth + margin);
+  const containerH = rows * (cardHeight + margin);
+  const startX = Math.max(40, (W - containerW) / 2);
+  const startY = Math.max(60, (H - containerH) / 2);
+  
+  politicians.forEach((p, idx) => {
+    const stat = stats[p.id];
+    const col = idx % cols;
+    const row = Math.floor(idx / cols);
+    const x = startX + col * (cardWidth + margin);
+    const y = startY + row * (cardHeight + margin);
+    
+    const card = document.createElement('div');
+    card.className = 'politician-card';
+    card.style.left = x + 'px';
+    card.style.top = y + 'px';
+    card.style.width = cardWidth + 'px';
+    card.style.height = cardHeight + 'px';
+    
+    const name = document.createElement('div');
+    name.className = 'politician-name';
+    name.textContent = p.name;
+    card.appendChild(name);
+
+    const meta = document.createElement('div');
+    meta.className = 'politician-meta';
+    meta.textContent = `${stat.total} posts`;
+    card.appendChild(meta);
+    
+    const chartSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    chartSvg.setAttribute('class', 'politician-chart');
+    chartSvg.setAttribute('viewBox', '0 0 100 60');
+    chartSvg.style.width = '100%';
+    chartSvg.style.height = '60px';
+    
+    const chartHeight = 50;
+    const chartWidth = 90;
+    let xOff = 5;
+    const categories = ['self', 'opponent', 'unknown', 'none'];
+    const colors = [SUBJECT_COLOR.self, SUBJECT_COLOR.opponent, SUBJECT_COLOR.unknown, SUBJECT_COLOR.none];
+    
+    categories.forEach((cat, i) => {
+      const pct = stat.percentages[cat];
+      const barH = pct * chartHeight;
+      const barW = chartWidth / categories.length;
+      
+      const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      rect.setAttribute('x', xOff);
+      rect.setAttribute('y', chartHeight - barH + 5);
+      rect.setAttribute('width', barW * 0.8);
+      rect.setAttribute('height', barH);
+      rect.setAttribute('fill', colors[i]);
+      rect.setAttribute('opacity', '0.85');
+      chartSvg.appendChild(rect);
+      
+      if (pct > 0.15) {
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', xOff + barW * 0.4);
+        text.setAttribute('y', chartHeight - barH + 5 + Math.max(12, barH / 2));
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('dominant-baseline', 'middle');
+        text.setAttribute('font-size', '8');
+        text.setAttribute('fill', '#ffffff');
+        text.setAttribute('font-weight', 'bold');
+        text.textContent = Math.round(pct * 100) + '%';
+        chartSvg.appendChild(text);
+      }
+      
+      xOff += barW;
+    });
+    
+    const baseline = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    baseline.setAttribute('x1', '5');
+    baseline.setAttribute('x2', '95');
+    baseline.setAttribute('y1', chartHeight + 5);
+    baseline.setAttribute('y2', chartHeight + 5);
+    baseline.setAttribute('stroke', 'rgba(255,255,255,0.2)');
+    baseline.setAttribute('stroke-width', '0.5');
+    chartSvg.appendChild(baseline);
+    
+    card.appendChild(chartSvg);
+    container.appendChild(card);
+  });
+}
+
+function renderPrimaryShareCards() {
+  const stats = calculatePoliticianStats(primaryShareMode);
+  let container = document.getElementById('politician-cards-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'politician-cards-container';
+    document.getElementById('viz-canvas').appendChild(container);
+  }
+
+  container.classList.add('visible');
+
+  const cardWidth = 220;
+  const cardHeight = 176;
+  const margin = 18;
+  let controlsEl = document.getElementById('share-controls-overlay');
+  if (!controlsEl) {
+    controlsEl = document.createElement('div');
+    controlsEl.id = 'share-controls-overlay';
+    controlsEl.className = 'share-controls';
+    controlsEl.style.position = 'fixed';
+    controlsEl.style.zIndex = '50';
+    document.body.appendChild(controlsEl);
+  }
+  controlsEl.innerHTML = `
+    <div class="share-control-group">
+      <button type="button" class="share-sort-btn${primaryShareMode === 'primary' ? ' is-active' : ''}" data-mode="primary">Dominant in beeld</button>
+      <button type="button" class="share-sort-btn${primaryShareMode === 'presence' ? ' is-active' : ''}" data-mode="presence">Ergens in beeld</button>
+    </div>
+    <div class="share-control-group">
+      <button type="button" class="share-sort-btn${primaryShareSort === 'self' ? ' is-active' : ''}" data-sort="self">Sorteer: meest zelf</button>
+      <button type="button" class="share-sort-btn${primaryShareSort === 'opponent' ? ' is-active' : ''}" data-sort="opponent">Sorteer: meest tegenstander</button>
+    </div>
+  `;
+  controlsEl.querySelectorAll('.share-sort-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const nextMode = btn.dataset.mode;
+      if (nextMode && nextMode !== primaryShareMode) {
+        primaryShareMode = nextMode;
+        renderPrimaryShareCards();
+        return;
+      }
+      const nextSort = btn.dataset.sort || 'self';
+      if (nextSort === primaryShareSort) return;
+      primaryShareSort = nextSort;
+      renderPrimaryShareCards();
+    });
+  });
+
+  const ordered = politicians
+    .map(p => stats[p.id])
+    .sort((a, b) => {
+      const diff = (b.percentages[primaryShareSort] || 0) - (a.percentages[primaryShareSort] || 0);
+      if (Math.abs(diff) > 0.0001) return diff;
+      return d3.ascending(a.politician.name, b.politician.name);
+    });
+
+  const cols = Math.max(2, Math.min(4, Math.floor((W - 40) / (cardWidth + margin))));
+  const rows = Math.ceil(ordered.length / cols);
+  const containerW = cols * (cardWidth + margin) - margin;
+  const containerH = rows * (cardHeight + margin) - margin;
+  const startX = Math.max(20, (W - containerW) / 2);
+  const startY = Math.max(70, (H - containerH) / 2);
+
+  ordered.forEach((stat, idx) => {
+    const p = stat.politician;
+    const col = idx % cols;
+    const row = Math.floor(idx / cols);
+    const x = startX + col * (cardWidth + margin);
+    const y = startY + row * (cardHeight + margin);
+
+    let card = container.querySelector(`[data-politician-id="${p.id}"]`);
+    if (!card) {
+      card = document.createElement('div');
+      card.className = 'politician-card';
+      card.dataset.politicianId = p.id;
+      container.appendChild(card);
+    }
+
+    card.style.left = x + 'px';
+    card.style.top = y + 'px';
+    card.style.width = cardWidth + 'px';
+    card.style.height = cardHeight + 'px';
+    card.innerHTML = '';
+
+    const name = document.createElement('div');
+    name.className = 'politician-name';
+    name.textContent = p.name;
+    card.appendChild(name);
+
+    const meta = document.createElement('div');
+    meta.className = 'politician-meta';
+    meta.textContent = `${stat.total} posts`;
+    card.appendChild(meta);
+
+    const bars = document.createElement('div');
+    bars.className = 'share-bars';
+
+    [
+      { key: 'self', label: 'Zelf', color: SUBJECT_COLOR.self },
+      { key: 'opponent', label: 'Tegenstander', color: SUBJECT_COLOR.opponent },
+      { key: 'unknown', label: 'Onbekend', color: SUBJECT_COLOR.unknown }
+    ].forEach(item => {
+      const rowEl = document.createElement('div');
+      rowEl.className = 'share-row';
+
+      const label = document.createElement('div');
+      label.className = 'share-label';
+      label.textContent = item.label;
+
+      const track = document.createElement('div');
+      track.className = 'share-track';
+
+      const fill = document.createElement('div');
+      fill.className = 'share-fill';
+      fill.style.width = `${Math.round(stat.percentages[item.key] * 100)}%`;
+      fill.style.background = item.color;
+      track.appendChild(fill);
+
+      const pct = document.createElement('div');
+      pct.className = 'share-pct';
+      pct.textContent = formatPercent(stat.percentages[item.key]);
+
+      rowEl.appendChild(label);
+      rowEl.appendChild(track);
+      rowEl.appendChild(pct);
+      bars.appendChild(rowEl);
+    });
+
+    const note = document.createElement('div');
+    note.className = 'share-note';
+    note.textContent = primaryShareMode === 'presence'
+      ? `Geen gezicht ${formatPercent(stat.percentages.none)}`
+      : `Primair geen gezicht ${formatPercent(stat.percentages.none)}`;
+    bars.appendChild(note);
+
+    card.appendChild(bars);
+  });
+
+  Array.from(container.querySelectorAll('.politician-card'))
+    .filter(card => !ordered.some(stat => stat.politician.id === card.dataset.politicianId))
+    .forEach(card => card.remove());
+}
+
+function hidePoliticianCards() {
+  const container = document.getElementById('politician-cards-container');
+  if (container) {
+    container.classList.remove('visible');
+  }
+  const overlay = document.getElementById('share-controls-overlay');
+  if (overlay) overlay.remove();
+}
+
+function updateAnnotations(step) {
+  annotG.selectAll('*').remove();
+
+  if (step === '2b') {
+    renderPrimaryShareCards();
+  } else if (step === 7) {
+    renderPoliticianCards();
+  } else {
+    hidePoliticianCards();
+  }
+
+  if (step === 4 || step === 5) {
+    const extent = d3.extent(nodes, d => d.date);
+    const xScale = d3.scaleTime().domain(extent).range([100, W - 60]);
+    const ticks = xScale.ticks(Math.min(10, Math.max(4, Math.floor(W / 120))));
+    const yMap = { self: H * 0.22, opponent: H * 0.40, unknown: H * 0.58, none: H * 0.76 };
+    const rowLabels = { self: 'Zichzelf', opponent: 'Tegenstander', unknown: 'Onbekend / other', none: 'Geen gezicht' };
+
+    renderEvents(xScale, H - 40);
+
+    ticks.forEach(tick => {
+      annotG.append('text')
+        .attr('x', xScale(tick)).attr('y', H - 18)
+        .attr('text-anchor', 'middle').attr('class', 'axis-label')
+        .text(formatMonthTick(tick));
+      annotG.append('line')
+        .attr('x1', xScale(tick)).attr('y1', H - 32)
+        .attr('x2', xScale(tick)).attr('y2', H - 28)
+        .attr('stroke', '#2a2e4a');
+    });
+
+    Object.entries(yMap).forEach(([key, y]) => {
+      annotG.append('text')
+        .attr('x', 90).attr('y', y)
+        .attr('text-anchor', 'end').attr('dominant-baseline', 'middle')
+        .attr('class', 'axis-label')
+        .text(rowLabels[key]);
+      annotG.append('line')
+        .attr('x1', 95).attr('y1', y).attr('x2', W - 40).attr('y2', y)
+        .attr('stroke', '#1a1e30').attr('stroke-width', 1).attr('stroke-dasharray', '3 6');
+    });
+  } else {
+    eventLayer.selectAll('.event').remove();
+  }
+
+  if (step === 3 || step === '3c') {
+    const cx = W / 2;
+    const cy = H / 2;
+    const clusterDefs = [
+      { x: cx - W * 0.24, y: cy - H * 0.18, label: 'Zichzelf', color: SUBJECT_COLOR.self },
+      { x: cx + W * 0.23, y: cy - H * 0.18, label: 'Tegenstander', color: SUBJECT_COLOR.opponent },
+      { x: cx - W * 0.18, y: cy + H * 0.22, label: 'Onbekend / other', color: SUBJECT_COLOR.unknown },
+      { x: cx + W * 0.18, y: cy + H * 0.22, label: 'Geen gezicht', color: SUBJECT_COLOR.none },
+    ];
+    clusterDefs.forEach(cl => {
+      annotG.append('text')
+        .attr('x', cl.x).attr('y', cl.y - 78)
+        .attr('text-anchor', 'middle')
+        .attr('font-family', "'Playfair Display', serif")
+        .attr('font-size', '15px')
+        .attr('font-style', 'italic')
+        .attr('fill', cl.color)
+        .attr('opacity', 0.7)
+        .text(cl.label);
+    });
+  }
+
+  if (step === 6) {
+    const cols = Math.min(4, politicians.length);
+    const rows = Math.ceil(politicians.length / cols);
+    const pw = W / cols;
+    const ph = H / rows;
+    politicians.forEach((pol, i) => {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      annotG.append('text')
+        .attr('x', col * pw + pw / 2).attr('y', row * ph + 28)
+        .attr('text-anchor', 'middle')
+        .attr('font-family', "'Playfair Display', serif")
+        .attr('font-size', '13px')
+        .attr('font-style', 'italic')
+        .attr('fill', pol.color)
+        .text(pol.name);
+      annotG.append('rect')
+        .attr('x', col * pw + 4).attr('y', row * ph + 4)
+        .attr('width', pw - 8).attr('height', ph - 8)
+        .attr('fill', 'none').attr('stroke', pol.color)
+        .attr('stroke-width', 0.5).attr('stroke-opacity', 0.2);
+    });
+  }
+}
+
+function updateLegend(step) {
+  const legend = document.getElementById('legend');
+  const items = document.getElementById('legend-items');
+  const title = document.getElementById('legend-title');
+
+  if (step === 0 || step === '2b' || step === 7) {
+    legend.classList.remove('visible');
+    return;
+  }
+  legend.classList.add('visible');
+
+  if (step === 1 || step === '3c') {
+    title.textContent = 'POLITICUS';
+    items.innerHTML = politicians.map(p => `<div class="legend-item"><div class="legend-dot" style="background:${p.color}"></div>${p.name}</div>`).join('');
+  } else if (step === 2 || step === 3 || step === 5 || step === 6) {
+    title.textContent = 'IN BEELD';
+    items.innerHTML = `
+      <div class="legend-item"><div class="legend-dot" style="background:${SUBJECT_COLOR.self}"></div>Zichzelf <span style="font-size:0.7rem;color:#3a3f5c">(fill)</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:${SUBJECT_COLOR.opponent}"></div>Tegenstander <span style="font-size:0.7rem;color:#3a3f5c">(fill)</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:${SUBJECT_COLOR.unknown}"></div>Onbekend / other <span style="font-size:0.7rem;color:#3a3f5c">(fill)</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:${SUBJECT_COLOR.none}"></div>Geen gezicht <span style="font-size:0.7rem;color:#3a3f5c">(fill)</span></div>
+      <div style="border-top:1px solid #1e2340;margin:0.5rem 0"></div>
+      <div class="legend-item" style="font-size:0.75rem;color:#3a3f5c">Ring = tweede persoon aanwezig</div>
+      <div class="legend-item" style="font-size:0.75rem;color:#3a3f5c">Stippel = derde persoon aanwezig</div>`;
+  } else if (step === 4) {
+    title.textContent = 'TIJDLIJN';
+    items.innerHTML = `
+      <div class="legend-item"><div class="legend-dot" style="background:${SUBJECT_COLOR.self}"></div>Zichzelf dominant</div>
+      <div class="legend-item"><div class="legend-dot" style="background:${SUBJECT_COLOR.opponent}"></div>Tegenstander dominant</div>
+      <div class="legend-item"><div class="legend-dot" style="background:${SUBJECT_COLOR.unknown}"></div>Onbekend dominant</div>
+      <div class="legend-item"><div class="legend-dot" style="background:${SUBJECT_COLOR.none}"></div>Geen gezicht</div>`;
+  }
+}
+
+function showTooltip(event, d) {
+  const tt = document.getElementById('tooltip');
+  document.getElementById('tt-name').textContent = d.politician.name;
+  document.getElementById('tt-meta').textContent = [d.party, d.profile, d.publication_date].filter(Boolean).join(' · ');
+  document.getElementById('tt-caption').textContent = d.caption ? `"${d.caption}"` : 'Geen caption beschikbaar';
+
+  const tags = [
+    { label: `primary: ${SUBJECT_LABEL[d.primarySubject] || d.primarySubject}`, color: SUBJECT_COLOR[d.primarySubject] || SUBJECT_COLOR.none },
+  ];
+  if (d.secondarySubject) tags.push({ label: `secondary: ${SUBJECT_LABEL[d.secondarySubject]}`, color: SUBJECT_COLOR[d.secondarySubject] });
+  if (d.tertiarySubject) tags.push({ label: `tertiary: ${SUBJECT_LABEL[d.tertiarySubject]}`, color: SUBJECT_COLOR[d.tertiarySubject] });
+  tags.push({ label: `${d.faceCount} gezicht${d.faceCount === 1 ? '' : 'en'}`, color: '#9b7fea' });
+
+  document.getElementById('tt-tags').innerHTML = tags.map(t => `<span class="tt-tag" style="background:${t.color}22;color:${t.color};border:1px solid ${t.color}44">${t.label}</span>`).join('');
+  tt.classList.add('visible');
+  moveTooltip(event);
+}
+
+function moveTooltip(event) {
+  const tt = document.getElementById('tooltip');
+  const x = event.clientX + 16;
+  const y = event.clientY - 10;
+  tt.style.left = (x + 320 > window.innerWidth ? x - 340 : x) + 'px';
+  tt.style.top = y + 'px';
+}
+
+function hideTooltip() {
+  document.getElementById('tooltip').classList.remove('visible');
+}
+
+function findNodeAt(x, y) {
+  for (let i = nodes.length - 1; i >= 0; i--) {
+    const d = nodes[i];
+    if (d.copacity < 0.12) continue;
+    const dx = x - d.cx;
+    const dy = y - d.cy;
+    const hit = d.cr + 4;
+    if (dx * dx + dy * dy <= hit * hit) return d;
+  }
+  return null;
+}
+
+function handleHover(event) {
+  if (!nodes.length) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const insideCanvas =
+    event.clientX >= rect.left &&
+    event.clientX <= rect.right &&
+    event.clientY >= rect.top &&
+    event.clientY <= rect.bottom;
+
+  if (!insideCanvas || currentStep === '2b') {
+    if (hoveredNode) {
+      hoveredNode = null;
+      hideTooltip();
+      drawNodes();
+    }
+    return;
+  }
+
+  const x = event.clientX - rect.left;
+  const y = event.clientY - rect.top;
+  const hit = findNodeAt(x, y);
+
+  if (hit !== hoveredNode) {
+    hoveredNode = hit;
+    drawNodes();
+    if (hit) showTooltip(event, hit);
+    else hideTooltip();
+  } else if (hit) {
+    moveTooltip(event);
+  }
+}
+
+window.addEventListener('mousemove', handleHover);
+window.addEventListener('mouseleave', () => {
+  hoveredNode = null;
+  hideTooltip();
+  drawNodes();
+});
+
+function updateSummaryCards() {
+  if (!posts.length) return;
+  const primaryCounts = d3.rollup(posts, v => v.length, d => d.primarySubject);
+  const topPrimary = Array.from(primaryCounts.entries()).sort((a, b) => b[1] - a[1])[0];
+  const topPol = Array.from(d3.rollup(posts, v => v.length, d => d.politician.name).entries()).sort((a, b) => b[1] - a[1])[0];
+  const selfShare = posts.filter(d => d.primarySubject === 'self').length / posts.length;
+  const opponentShare = posts.filter(d => d.opponentPresent).length / posts.length;
+
+  document.getElementById('summary-primary-type').textContent = SUBJECT_LABEL[topPrimary[0]];
+  document.getElementById('summary-primary-desc').textContent = `${formatPercent(topPrimary[1] / posts.length)} van alle posts valt in deze categorie`;
+  document.getElementById('summary-self-share').textContent = formatPercent(selfShare);
+  document.getElementById('summary-opponent-share').textContent = formatPercent(opponentShare);
+  document.getElementById('summary-top-politician').textContent = topPol[0];
+  document.getElementById('summary-top-politician-desc').textContent = `${topPol[1]} posts in deze dataset`;
+}
+
+function updateHeroStats() {
+  const totalPosts = posts.length;
+  const totalPoliticians = politicians.length;
+  const opponentPosts = posts.filter(d => d.opponentPresent).length;
+  document.getElementById('hero-posts').textContent = totalPosts;
+  document.getElementById('hero-politicians').textContent = totalPoliticians;
+  document.getElementById('hero-opponents').textContent = formatPercent(totalPosts ? opponentPosts / totalPosts : 0);
+}
+
+function rebuildNodes() {
+  nodes = posts.map(p => ({ ...p, x: W / 2, y: H / 2 }));
+  nodes.forEach((n, i) => {
+    n.x0 = 60 + (((i * 97) % 1000) / 1000) * (W - 120);
+    n.y0 = 60 + (((i * 57 + 113) % 1000) / 1000) * (H - 120);
+    n.cx = n.x0;
+    n.cy = n.y0;
+    n.cr = 3;
+    n.cfill = '#1a1e38';
+    n.cstroke = null;
+    n.cstrokeWidth = 0;
+    n.cdash = [];
+    n.copacity = 0.65;
+  });
+}
+
+function resize() {
+  W = window.innerWidth;
+  H = window.innerHeight;
+  svg.attr('width', W).attr('height', H);
+  resizeCanvas();
+  gridPositions();
+  timelinePositions();
+  buildClusterPositions();
+  smallMultiplesPositions();
+  applyStepState(currentStep);
+  updateAnnotations(currentStep);
+  drawNodes();
+}
+
+function activateScroller() {
+  const STEP_MAP = [0, 1, '2b', 4];
+  scroller = scrollama();
+  scroller.setup({ step: '.step', offset: 0.5, debug: false })
+    .onStepEnter(({ element, index }) => {
+      document.querySelectorAll('.step-card').forEach(c => c.classList.remove('is-active'));
+      element.querySelector('.step-card').classList.add('is-active');
+      animateToStep(STEP_MAP[index]);
+    })
+    .onStepExit(({ element, direction }) => {
+      if (direction === 'up') element.querySelector('.step-card').classList.remove('is-active');
+    });
+}
+
+async function init() {
+  try {
+    setStatus('Data wordt geladen uit ./data/wies_viz.json ...');
+    posts = await loadPosts();
+    if (!posts.length) {
+      throw new Error('De JSON is geladen, maar bevat geen posts onder posts.');
+    }
+
+    rebuildNodes();
+    resize();
+    updateHeroStats();
+    updateSummaryCards();
+    setStatus('');
+    activateScroller();
+  } catch (error) {
+    console.error(error);
+    setStatus(error.message, true);
+  }
+}
+
+window.addEventListener('resize', () => {
+  if (!posts.length) return;
+  resize();
+  if (scroller) scroller.resize();
+});
+
+init();
+</script>
+</body>
+</html>
