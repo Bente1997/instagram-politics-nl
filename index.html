@@ -442,6 +442,117 @@
     #legend { left: 1rem; right: 1rem; bottom: 1rem; min-width: auto; }
   }
 
+  /* ── Proportional timeline chart ─────────────────────────────── */
+  .prop-section {
+    padding: 6rem 2rem 5rem;
+    background: var(--bg);
+    position: relative;
+  }
+
+  .prop-section::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 70% 50% at 50% 0%, rgba(62,232,192,0.05) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .prop-header {
+    max-width: 760px;
+    margin: 0 auto 3.5rem;
+    text-align: center;
+  }
+
+  .prop-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--accent-teal);
+    margin-bottom: 1rem;
+  }
+
+  .prop-header h2 {
+    font-family: var(--font-display);
+    font-size: clamp(1.8rem, 4vw, 3rem);
+    font-weight: 700;
+    line-height: 1.15;
+    margin-bottom: 1rem;
+  }
+
+  .prop-header p {
+    color: var(--muted);
+    font-size: 1rem;
+    line-height: 1.7;
+    max-width: 580px;
+    margin: 0 auto;
+  }
+
+  .prop-controls {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+  }
+
+  .prop-btn {
+    border: 1px solid var(--border);
+    background: rgba(13,15,30,0.92);
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 0.55rem 1rem;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s, background 0.2s;
+  }
+
+  .prop-btn:hover { color: var(--text); border-color: rgba(240,192,96,0.4); }
+  .prop-btn.is-active {
+    color: var(--bg);
+    background: var(--accent-gold);
+    border-color: var(--accent-gold);
+  }
+
+  #prop-chart-wrap {
+    max-width: 1200px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  #prop-svg {
+    width: 100%;
+    display: block;
+    overflow: visible;
+  }
+
+  .prop-legend {
+    display: flex;
+    justify-content: center;
+    gap: 1.75rem;
+    margin-top: 1.75rem;
+    flex-wrap: wrap;
+  }
+
+  .prop-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    letter-spacing: 0.06em;
+  }
+
+  .prop-legend-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
   .event-glow {
     stroke: rgba(240, 192, 96, 0.16);
     stroke-width: 8;
@@ -720,6 +831,42 @@
       </div>
     </div>
 
+  </div>
+</section>
+
+<!-- ── Proportional sentiment timeline ────────────────────────── -->
+<section class="prop-section" id="prop-section">
+  <div class="prop-header">
+    <div class="prop-eyebrow">Stap 05b · Sentimentverdeling over de tijd</div>
+    <h2>Hoe verschuift het beeld <em>proportioneel</em>?</h2>
+    <p>Per tijdvak zie je welk aandeel van de posts zichzelf, de tegenstander, onbekenden of geen gezicht toont. De gouden lijnen markeren verkiezingsmomenten.</p>
+  </div>
+
+  <div class="prop-controls">
+    <button class="prop-btn is-active" data-bin="week">Per week</button>
+    <button class="prop-btn" data-bin="month">Per maand</button>
+  </div>
+
+  <div id="prop-chart-wrap">
+    <svg id="prop-svg"></svg>
+  </div>
+
+  <div class="prop-legend">
+    <div class="prop-legend-item">
+      <div class="prop-legend-swatch" style="background:#3ee8c0"></div>Zichzelf dominant
+    </div>
+    <div class="prop-legend-item">
+      <div class="prop-legend-swatch" style="background:#e8556a"></div>Tegenstander dominant
+    </div>
+    <div class="prop-legend-item">
+      <div class="prop-legend-swatch" style="background:#5a6080"></div>Onbekend dominant
+    </div>
+    <div class="prop-legend-item">
+      <div class="prop-legend-swatch" style="background:#2a2e4a; border: 1px solid #3a3f60"></div>Geen gezicht
+    </div>
+    <div class="prop-legend-item" style="color:#f5d79a">
+      <div class="prop-legend-swatch" style="background:#f0c060;border-radius:50%"></div>Verkiezingsmoment
+    </div>
   </div>
 </section>
 
@@ -1740,6 +1887,365 @@ function activateScroller() {
     });
 }
 
+// ── Proportional sentiment timeline chart ─────────────────────
+let propBinMode = 'week';
+
+function buildPropData(binMode) {
+  if (!posts.length) return [];
+
+  const extent = d3.extent(posts, d => d.date);
+  const [minDate, maxDate] = extent;
+
+  // Generate bin boundaries
+  let boundaries = [];
+  if (binMode === 'week') {
+    let cur = d3.timeWeek.floor(minDate);
+    while (cur <= maxDate) {
+      boundaries.push(cur);
+      cur = d3.timeWeek.offset(cur, 1);
+    }
+  } else {
+    let cur = d3.timeMonth.floor(minDate);
+    while (cur <= maxDate) {
+      boundaries.push(cur);
+      cur = d3.timeMonth.offset(cur, 1);
+    }
+  }
+  boundaries.push(binMode === 'week' ? d3.timeWeek.offset(maxDate, 1) : d3.timeMonth.offset(maxDate, 1));
+
+  const rows = [];
+  for (let i = 0; i < boundaries.length - 1; i++) {
+    const t0 = boundaries[i];
+    const t1 = boundaries[i + 1];
+    const bucket = posts.filter(p => p.date >= t0 && p.date < t1);
+    if (!bucket.length) continue;
+    const total = bucket.length;
+    const counts = { self: 0, opponent: 0, unknown: 0, none: 0 };
+    bucket.forEach(p => { counts[p.primarySubject] = (counts[p.primarySubject] || 0) + 1; });
+    rows.push({
+      date: t0,
+      dateEnd: t1,
+      total,
+      self: counts.self / total,
+      opponent: counts.opponent / total,
+      unknown: counts.unknown / total,
+      none: counts.none / total,
+    });
+  }
+  return rows;
+}
+
+function renderPropChart(binMode) {
+  const wrap = document.getElementById('prop-chart-wrap');
+  const svgEl = document.getElementById('prop-svg');
+  if (!wrap || !svgEl) return;
+
+  const data = buildPropData(binMode);
+  if (!data.length) return;
+
+  const W2 = wrap.clientWidth || 900;
+  const marginTop = 36, marginRight = 24, marginBottom = 52, marginLeft = 56;
+  const innerW = W2 - marginLeft - marginRight;
+
+  // Two panels: volume (top) + proportional (bottom)
+  const volH = 130;
+  const gap  = 18;
+  const propH = 260;
+  const totalH = marginTop + volH + gap + propH + marginBottom;
+
+  svgEl.setAttribute('viewBox', `0 0 ${W2} ${totalH}`);
+  svgEl.setAttribute('height', totalH);
+
+  const propSvg = d3.select('#prop-svg');
+  propSvg.selectAll('*').remove();
+
+  // ── Shared x-scale ───────────────────────────────────────────
+  const xScale = d3.scaleTime()
+    .domain(d3.extent(data, d => d.date))
+    .range([0, innerW]);
+
+  const xTicks = xScale.ticks(Math.min(12, Math.max(4, Math.floor(innerW / 80))));
+
+  const colors = {
+    self: '#3ee8c0',
+    opponent: '#e8556a',
+    unknown: '#5a6080',
+    none: '#1a1e38'
+  };
+
+  // ── Shared election-line helper ───────────────────────────────
+  function drawElectionLines(group, height, showLabel) {
+    EVENTS.forEach((ev, idx) => {
+      const ex = xScale(ev.date);
+      if (ex < 0 || ex > innerW) return;
+
+      group.append('line')
+        .attr('x1', ex).attr('x2', ex)
+        .attr('y1', 0).attr('y2', height)
+        .attr('stroke', 'rgba(240,192,96,0.12)')
+        .attr('stroke-width', 10)
+        .attr('stroke-linecap', 'round');
+
+      group.append('line')
+        .attr('x1', ex).attr('x2', ex)
+        .attr('y1', 0).attr('y2', height)
+        .attr('stroke', 'rgba(240,192,96,0.72)')
+        .attr('stroke-width', 1.5)
+        .attr('stroke-dasharray', '6 5')
+        .attr('stroke-linecap', 'round');
+
+      if (showLabel) {
+        // Alternate label Y to avoid overlap when events are close
+        const labelY = (idx % 2 === 0) ? -14 : -26;
+        const labelW = Math.min(ev.label.length * 6 + 16, 176);
+        group.append('rect')
+          .attr('x', ex - labelW / 2).attr('y', labelY - 9)
+          .attr('width', labelW).attr('height', 14)
+          .attr('rx', 2)
+          .attr('fill', 'rgba(6,7,15,0.90)')
+          .attr('stroke', 'rgba(240,192,96,0.28)')
+          .attr('stroke-width', 0.8);
+        group.append('text')
+          .attr('x', ex).attr('y', labelY)
+          .attr('text-anchor', 'middle').attr('dominant-baseline', 'middle')
+          .attr('font-family', "'DM Mono', monospace")
+          .attr('font-size', 8).attr('fill', '#f5d79a')
+          .attr('letter-spacing', '0.06em')
+          .text(ev.label.toUpperCase());
+      }
+
+      // Connector dot between panels
+      group.append('circle')
+        .attr('cx', ex).attr('cy', height + gap / 2)
+        .attr('r', 3).attr('fill', '#f0c060').attr('opacity', 0.85);
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // PANEL 1 — Volume (absolute post count per bin)
+  // ══════════════════════════════════════════════════════════════
+  const gVol = propSvg.append('g')
+    .attr('transform', `translate(${marginLeft},${marginTop})`);
+
+  const maxTotal = d3.max(data, d => d.total);
+  const yVol = d3.scaleLinear()
+    .domain([0, maxTotal * 1.12])
+    .range([volH, 0]);
+
+  // Panel label
+  gVol.append('text')
+    .attr('x', -marginLeft + 4).attr('y', -18)
+    .attr('font-family', "'DM Mono', monospace")
+    .attr('font-size', 9).attr('fill', '#5a6080')
+    .attr('letter-spacing', '0.15em').attr('text-transform', 'uppercase')
+    .text('AANTAL POSTS');
+
+  // Y-axis ticks (volume)
+  const volTicks = yVol.ticks(4);
+  volTicks.forEach(t => {
+    gVol.append('line')
+      .attr('x1', 0).attr('x2', innerW)
+      .attr('y1', yVol(t)).attr('y2', yVol(t))
+      .attr('stroke', '#1a1e30').attr('stroke-width', 1)
+      .attr('stroke-dasharray', t === 0 ? 'none' : '3 6');
+    gVol.append('text')
+      .attr('x', -8).attr('y', yVol(t))
+      .attr('text-anchor', 'end').attr('dominant-baseline', 'middle')
+      .attr('font-family', "'DM Mono', monospace")
+      .attr('font-size', 9).attr('fill', '#3a3f5c')
+      .text(t);
+  });
+
+  // Bars, coloured by dominant category
+  const binW = data.length > 1
+    ? Math.max(1, xScale(data[1].date) - xScale(data[0].date) - 1)
+    : 8;
+
+  data.forEach(d => {
+    // Determine dominant key for colour
+    const dominant = ['self','opponent','unknown','none']
+      .reduce((best, k) => d[k] > d[best] ? k : best, 'none');
+
+    gVol.append('rect')
+      .attr('x', xScale(d.date))
+      .attr('y', yVol(d.total))
+      .attr('width', binW)
+      .attr('height', volH - yVol(d.total))
+      .attr('fill', colors[dominant])
+      .attr('opacity', 0.55)
+      .attr('rx', 1);
+
+    // Thin accent line on top
+    gVol.append('rect')
+      .attr('x', xScale(d.date))
+      .attr('y', yVol(d.total))
+      .attr('width', binW)
+      .attr('height', 2)
+      .attr('fill', colors[dominant])
+      .attr('opacity', 0.9)
+      .attr('rx', 1);
+  });
+
+  // Election lines on volume panel (with labels)
+  drawElectionLines(gVol, volH, true);
+
+  // ══════════════════════════════════════════════════════════════
+  // PANEL 2 — Proportional stacked area
+  // ══════════════════════════════════════════════════════════════
+  const gProp = propSvg.append('g')
+    .attr('transform', `translate(${marginLeft},${marginTop + volH + gap})`);
+
+  // Panel label
+  gProp.append('text')
+    .attr('x', -marginLeft + 4).attr('y', -8)
+    .attr('font-family', "'DM Mono', monospace")
+    .attr('font-size', 9).attr('fill', '#5a6080')
+    .attr('letter-spacing', '0.15em')
+    .text('AANDEEL (%)');
+
+  const keys = ['none', 'unknown', 'opponent', 'self'];
+  const stack = d3.stack().keys(keys).offset(d3.stackOffsetNone);
+  const series = stack(data);
+
+  const yProp = d3.scaleLinear().domain([0, 1]).range([propH, 0]);
+
+  // Grid lines
+  [0, 0.25, 0.5, 0.75, 1].forEach(t => {
+    gProp.append('line')
+      .attr('x1', 0).attr('x2', innerW)
+      .attr('y1', yProp(t)).attr('y2', yProp(t))
+      .attr('stroke', '#1a1e30').attr('stroke-width', 1)
+      .attr('stroke-dasharray', (t === 0 || t === 1) ? 'none' : '4 6');
+    gProp.append('text')
+      .attr('x', -8).attr('y', yProp(t))
+      .attr('text-anchor', 'end').attr('dominant-baseline', 'middle')
+      .attr('font-family', "'DM Mono', monospace")
+      .attr('font-size', 9.5).attr('fill', '#3a3f5c')
+      .text(`${Math.round(t * 100)}%`);
+  });
+
+  // Stacked areas
+  const area = d3.area()
+    .x(d => xScale(d.data.date))
+    .y0(d => yProp(d[0]))
+    .y1(d => yProp(d[1]))
+    .curve(d3.curveCatmullRom.alpha(0.5));
+
+  series.forEach(s => {
+    gProp.append('path')
+      .datum(s)
+      .attr('d', area)
+      .attr('fill', colors[s.key])
+      .attr('opacity', s.key === 'none' ? 0.55 : 0.80);
+
+    const lineTop = d3.line()
+      .x(d => xScale(d.data.date))
+      .y(d => yProp(d[1]))
+      .curve(d3.curveCatmullRom.alpha(0.5));
+    gProp.append('path')
+      .datum(s)
+      .attr('d', lineTop)
+      .attr('fill', 'none')
+      .attr('stroke', colors[s.key])
+      .attr('stroke-width', 0.8)
+      .attr('opacity', 0.35);
+  });
+
+  // Election lines on proportional panel (no labels — already shown above)
+  drawElectionLines(gProp, propH, false);
+
+  // Shared X axis ticks (on bottom of proportional panel)
+  xTicks.forEach(tick => {
+    gProp.append('text')
+      .attr('x', xScale(tick)).attr('y', propH + 28)
+      .attr('text-anchor', 'middle')
+      .attr('font-family', "'DM Mono', monospace")
+      .attr('font-size', 9.5).attr('fill', '#3a3f5c')
+      .attr('letter-spacing', '0.05em')
+      .text(formatMonthTick(tick));
+    gProp.append('line')
+      .attr('x1', xScale(tick)).attr('x2', xScale(tick))
+      .attr('y1', propH + 2).attr('y2', propH + 8)
+      .attr('stroke', '#2a2e4a');
+  });
+
+  // ── Shared tooltip overlay ────────────────────────────────────
+  const propTooltip = document.getElementById('prop-tooltip') || (() => {
+    const el = document.createElement('div');
+    el.id = 'prop-tooltip';
+    el.style.cssText = 'position:fixed;z-index:300;pointer-events:none;background:var(--card);border:1px solid var(--border);padding:0.75rem 1rem;font-size:0.78rem;line-height:1.6;opacity:0;transition:opacity 0.15s;max-width:230px;font-family:var(--font-body)';
+    document.body.appendChild(el);
+    return el;
+  })();
+
+  // Invisible overlay rects spanning both panels
+  const fullH = volH + gap + propH;
+  data.forEach(d => {
+    const x0 = xScale(d.date);
+    propSvg.append('rect')
+      .attr('x', marginLeft + x0)
+      .attr('y', marginTop)
+      .attr('width', Math.max(1, binW))
+      .attr('height', fullH)
+      .attr('fill', 'transparent')
+      .style('cursor', 'crosshair')
+      .on('mouseenter', function(event) {
+        const label = binMode === 'week'
+          ? `Week van ${d.date.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: '2-digit' })}`
+          : d.date.toLocaleDateString('nl-NL', { month: 'long', year: 'numeric' });
+        const dominant = ['self','opponent','unknown','none']
+          .reduce((best, k) => d[k] > d[best] ? k : best, 'none');
+        const domLabel = { self: 'Zichzelf', opponent: 'Tegenstander', unknown: 'Onbekend', none: 'Geen gezicht' }[dominant];
+        propTooltip.innerHTML = `
+          <div style="font-family:var(--font-mono);font-size:0.65rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:0.4rem">${label}</div>
+          <div style="font-size:0.9rem;font-weight:600;color:var(--text);margin-bottom:0.15rem">${d.total} <span style="font-size:0.75rem;font-weight:400;color:var(--muted)">posts</span></div>
+          <div style="font-size:0.72rem;color:${colors[dominant]};margin-bottom:0.55rem">Dominant: ${domLabel}</div>
+          <div style="border-top:1px solid var(--border);padding-top:0.45rem;display:flex;flex-direction:column;gap:0.25rem">
+            ${[['self','#3ee8c0','Zichzelf'],['opponent','#e8556a','Tegenstander'],['unknown','#5a6080','Onbekend'],['none','#3a3f5c','Geen gezicht']]
+              .map(([k,c,l]) => `<div style="display:flex;justify-content:space-between;gap:1rem;align-items:center">
+                <span style="color:${c}">${l}</span>
+                <span style="font-family:var(--font-mono);font-size:0.75rem">${Math.round(d[k]*100)}%</span>
+              </div>`).join('')}
+          </div>`;
+        propTooltip.style.opacity = 1;
+
+        // Highlight column
+        propSvg.selectAll('.hover-col').remove();
+        propSvg.insert('rect', ':first-child')
+          .attr('class', 'hover-col')
+          .attr('x', marginLeft + x0)
+          .attr('y', marginTop)
+          .attr('width', Math.max(1, binW))
+          .attr('height', fullH)
+          .attr('fill', 'rgba(255,255,255,0.04)')
+          .attr('pointer-events', 'none');
+      })
+      .on('mousemove', function(event) {
+        const tx = event.clientX + 16;
+        const ty = event.clientY - 10;
+        propTooltip.style.left = (tx + 240 > window.innerWidth ? tx - 260 : tx) + 'px';
+        propTooltip.style.top = ty + 'px';
+      })
+      .on('mouseleave', function() {
+        propTooltip.style.opacity = 0;
+        propSvg.selectAll('.hover-col').remove();
+      });
+  });
+}
+
+function initPropChart() {
+  document.querySelectorAll('.prop-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.prop-btn').forEach(b => b.classList.remove('is-active'));
+      btn.classList.add('is-active');
+      propBinMode = btn.dataset.bin;
+      renderPropChart(propBinMode);
+    });
+  });
+}
+
+// ── End proportional chart ─────────────────────────────────────
+
 async function init() {
   try {
     setStatus('Data wordt geladen uit ./data/wies_viz.json ...');
@@ -1752,6 +2258,8 @@ async function init() {
     resize();
     updateHeroStats();
     updateSummaryCards();
+    initPropChart();
+    renderPropChart(propBinMode);
     setStatus('');
     activateScroller();
   } catch (error) {
@@ -1763,6 +2271,7 @@ async function init() {
 window.addEventListener('resize', () => {
   if (!posts.length) return;
   resize();
+  renderPropChart(propBinMode);
   if (scroller) scroller.resize();
 });
 
